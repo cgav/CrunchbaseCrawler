@@ -7,9 +7,8 @@ class CrunchbaseAPI
 	constructor: (userKey) ->
 		@userKey = userKey
 
-	getOrganizationData: (organization, callback, failCallback) =>
+	getOrganizationData: (organization, callback) =>
 		url = "http://api.crunchbase.com/v/2/organization/#{organization}?user_key=#{@userKey}"
-		# console.log url
 
 		options =
 			uri: url
@@ -17,16 +16,16 @@ class CrunchbaseAPI
 
 		request options, (err, response, body) =>
 			if err?
-				return failCallback?(err)
+				return callback?(err, null)
 
 			try
 				json = JSON.parse(body)
 			catch e
-				return failCallback?("quota error")
+				return callback?("quota error", null)
 			
-			callback?(json)
+			return callback?(null, json)
 
-	getOrganizationPage: (pageIndex, callback, failCallback) =>
+	getOrganizationPage: (pageIndex, callback) =>
 		url = "http://api.crunchbase.com/v/2/organizations?organization_types=company&user_key=#{@userKey}&page=#{pageIndex}&order=updated_at+ASC"
 		
 		options =
@@ -34,7 +33,7 @@ class CrunchbaseAPI
 
 		request options, (err, response, body) =>
 			if err?
-				return failCallback?(err)
+				return callback?(err, null)
 
 			json = JSON.parse(body)
 			organizations = []
@@ -48,21 +47,24 @@ class CrunchbaseAPI
 
 			# returning the remaining pages
 			setTimeout =>
-				callback?(organizations, json.data.paging.number_of_pages - json.data.paging.current_page)
+				callback?(null, organizations, json.data.paging.number_of_pages - json.data.paging.current_page)
 			, 5000
 
 	getAllOrganizations: (stepCallback, callback) =>
 		allOrganizations = []
 
 		getPage = (index) =>
-			@getOrganizationPage index, (organizations, remaining) =>
+			@getOrganizationPage index, (err, organizations, remaining) =>
+				if err?
+					return callback?(err, null)
+
 				allOrganizations = allOrganizations.concat(organizations)
 
 				if remaining > 0
-					if stepCallback?(organizations)
+					if stepCallback?(null, organizations)
 						getPage(index + 1)
 				else 		
-					callback?(allOrganizations)
+					callback?(null, allOrganizations)
 
 		getPage(1)
 
